@@ -1,39 +1,39 @@
 # AeroIntel Atlas
 
-AeroIntel Atlas, NATO ve BRICS ulkelerinin acik kaynak hava gucu envanterlerini
-etkilesimli dunya haritasi uzerinde incelemek icin hazirlanmis statik bir web
-projesidir. Site Turkce ve Ingilizce arayuz, ulke hava gucu paneli, ucak detay
-paneli, muhimmat bilgi kartlari, kullanici profili ve AI karsilastirma analizi
-icerir.
+AeroIntel Atlas is a static website for exploring open-source air power
+inventories of NATO and BRICS countries on an interactive world map. It offers
+Turkish and English interfaces, country and aircraft detail panels, munition
+profiles, user accounts, and AI-assisted comparison.
 
-## Calistirma
+## Run Locally
 
-1. Proje klasorunu ac.
-2. `index.html` dosyasini Chrome, Edge veya Firefox ile ac.
-3. Ek kurulum, veritabani veya sunucu gerekmez.
+1. Open the project folder.
+2. Open `index.html` in Chrome, Edge, or Firefox.
+3. No installation, database, or server is required.
 
-Not: Uygulamanin temel dosyalari ve gorselleri yereldir. Dis baglantilar sadece
-kaynak ve gorsel kredi linkleri icindir.
+The core application files and images are bundled locally. Source and image
+credit links open external websites.
 
-## Ana Ozellikler
+## Features
 
-- NATO ulkeleri mavi, BRICS uyeleri kirmizi gosterilen zoom destekli dunya haritasi.
-- Ulkeye tiklayinca acilan hava gucu profili ve scroll destekli ucak envanteri.
-- Ucak seciminde acilan detay paneli, teknik bilgiler, kaynak guveni ve gorsel kredi alani.
-- Ucaklara gore listelenen tiklanabilir muhimmatlar ve muhimmat gorselleri.
-- Turkce / Ingilizce dil secimi.
-- Kayit, giris, sifremi unuttum, profil ve ayarlar prototipi.
-- Favori, karsilastirma ve kategori bazli AI karsilastirma analizi.
-- Kaynaklar ve hesap detaylari iceren kontrol menusu.
+- Zoomable world map with NATO countries in blue and BRICS members in red.
+- Country air power profiles and scrollable aircraft inventories.
+- Aircraft detail panels with specifications, capability profiles, source
+  information, and image credits.
+- Clickable munition profiles with images and descriptions.
+- Turkish and English language selection.
+- Prototype registration, sign-in, password reset, profile, and settings.
+- Favorites, aircraft and country comparisons, and profile-based AI analysis.
+- A control menu with account details and sources.
 
-## Rapor Dosyalari
+## Academic Documents
 
-Ders teslimine ait raporlar yerel `docs/` klasorundedir. Bu klasor kisisel
-bilgiler icerdiginden GitHub deposuna eklenmez.
+The reports for the course submission are stored locally in `docs/`. This
+folder contains personal information and is excluded from the GitHub repository.
 
-## Teslim Icin Gerekli Dosyalar
+## Files for the Course Submission
 
-Flash bellekte asagidaki dosya ve klasorler bulunmalidir:
+Copy these files and folders to the USB drive:
 
 - `index.html`
 - `styles.css`
@@ -42,13 +42,13 @@ Flash bellekte asagidaki dosya ve klasorler bulunmalidir:
 - `docs/`
 - `README.md`
 
-`tools/` klasoru raporlari ve gorsel kataloglarini yeniden uretmek icin
-yardimci scriptler icerir. Siteyi calistirmak icin gerekli degildir ve GitHub
-deposuna eklenmez. Hocaya kaynak kodu tam teslim edilecekse yerel klasorden
-ayrica alinabilir.
+The local `tools/` folder contains scripts for rebuilding reports and image
+catalogs. It is not needed to run the website and is excluded from the GitHub
+repository. Include it separately only if the complete development source is
+required for the course submission.
 
-## Teknik Notlar
+## Technical Notes
 
-Kullanici sistemi ve AI analizi ders projesi prototipi olarak tarayici tarafinda
-calisir. Kayit/giris bilgileri localStorage icinde tutulur; gercek uretim
-surumunde backend, veritabani ve e-posta dogrulama eklenmelidir.
+Accounts and AI analysis are browser-side prototypes. Account data is stored
+in localStorage, and the password reset flow does not send email. A production
+version would need a backend, database, and email verification.
