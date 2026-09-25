@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.agents/
+.codex/
+.DS_Store
+Thumbs.db
+docs/
+tools/
+.env
+.env.*
+!.env.example

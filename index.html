@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AeroIntel Atlas</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="assets/vendor/d3.min.js" defer></script>
+    <script src="assets/vendor/topojson-client.min.js" defer></script>
+    <script src="assets/data/countries-110m.js" defer></script>
+    <script src="assets/aircraft/image-sources.js" defer></script>
+    <script src="assets/munitions/image-sources.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body class="performance-lite">
+    <div class="screen-grain" aria-hidden="true"></div>
+    <header class="command-bar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span>
+          <span></span>
+        </div>
+        <div>
+          <p class="eyebrow">Açık Kaynak Hava Gücü İzleme Konsolu</p>
+          <h1>AeroIntel Atlas</h1>
+        </div>
+      </div>
+      <div class="command-actions">
+        <div class="status-strip" aria-label="Sistem durumu">
+          <span><i class="status-dot green"></i>Harita aktif</span>
+          <span><i class="status-dot amber"></i>Veri açık kaynak</span>
+          <span><i class="status-dot blue"></i>Türkçe arayüz</span>
+        </div>
+        <label class="language-switch" for="languageSelect">
+          <span>Dil</span>
+          <select id="languageSelect" aria-label="Dil seçimi">
+            <option value="tr">TR</option>
+            <option value="en">EN</option>
+          </select>
+        </label>
+        <button class="menu-trigger" type="button" id="menuOpen" aria-haspopup="dialog" aria-expanded="false">
+          <span class="menu-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>Menü</span>
+        </button>
+        <button class="auth-trigger" type="button" id="authOpen" aria-haspopup="dialog">
+          <span class="auth-signal" aria-hidden="true"></span>
+          <span id="authTriggerText">Giriş / Kayıt</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="map-console" aria-labelledby="mapTitle">
+        <div class="console-head">
+          <div>
+            <p class="eyebrow">Küresel ittifak görünümü</p>
+            <h2 id="mapTitle">Dünya Haritası</h2>
+          </div>
+          <div class="segmented-control" role="group" aria-label="İttifak filtresi">
+            <button class="seg-btn active" type="button" data-filter="all">Tümü</button>
+            <button class="seg-btn" type="button" data-filter="NATO">NATO</button>
+            <button class="seg-btn" type="button" data-filter="BRICS">BRICS</button>
+          </div>
+        </div>
+
+        <div class="map-frame">
+          <svg id="worldMap" role="img" aria-label="NATO ülkeleri mavi, BRICS üyeleri kırmızı gösterilen dünya haritası"></svg>
+          <div id="fallbackMap" class="fallback-map hidden" aria-hidden="true"></div>
+          <div class="map-zoom-controls" aria-label="Harita yakınlaştırma kontrolleri">
+            <button class="zoom-btn" type="button" id="zoomIn" aria-label="Haritayı yakınlaştır">+</button>
+            <button class="zoom-btn" type="button" id="zoomOut" aria-label="Haritayı uzaklaştır">-</button>
+            <button class="zoom-btn reset" type="button" id="zoomReset" aria-label="Harita yakınlaştırmasını sıfırla">1:1</button>
+            <span class="zoom-level" id="zoomLevel">1.0x</span>
+          </div>
+          <div class="map-overlay">
+            <span class="readout" id="mapReadout">Ülke seçimi bekleniyor</span>
+            <span class="scanline"></span>
+          </div>
+        </div>
+
+        <div class="legend-row">
+          <span><i class="legend-swatch nato"></i>NATO üyesi</span>
+          <span><i class="legend-swatch brics"></i>BRICS üyesi</span>
+          <span><i class="legend-swatch neutral"></i>Diğer ülkeler</span>
+        </div>
+      </section>
+
+      <aside class="intel-console" aria-label="Ülke ve uçak bilgi paneli">
+        <div class="search-block">
+          <label for="countrySearch">Ülke ara</label>
+          <input id="countrySearch" type="search" placeholder="Amerika, Türkiye, Rusya..." autocomplete="off" />
+          <div class="country-results" id="countryResults" aria-label="Ülke arama sonuçları"></div>
+        </div>
+
+        <section class="country-summary" aria-live="polite">
+          <div class="alliance-badge" id="allianceBadge">NATO</div>
+          <p class="eyebrow" id="countryCode">USA</p>
+          <h2 id="countryName">Amerika Birleşik Devletleri</h2>
+          <p id="countryDescription">
+            Beşinci nesil stealth platformları, deniz havacılığı ve küresel tanker/erken uyarı ağıyla en geniş muharip hava gücü portföylerinden birine sahiptir.
+          </p>
+          <dl class="metric-grid">
+            <div>
+              <dt>Komuta</dt>
+              <dd id="countryCommand">USAF / US Navy / USMC</dd>
+            </div>
+            <div>
+              <dt>Odak</dt>
+              <dd id="countryFocus">Hava üstünlüğü, taarruz, deniz konuşlu güç</dd>
+            </div>
+          </dl>
+          <div class="country-analysis-grid" id="countryAnalysisGrid"></div>
+          <div class="country-timeline">
+            <div class="section-title-row compact">
+              <h3>Modernizasyon Çizelgesi</h3>
+              <span id="countryTimelineStatus">Açık kaynak okuması</span>
+            </div>
+            <div id="countryTimeline"></div>
+          </div>
+        </section>
+
+        <section class="inventory-section">
+          <div class="section-title-row">
+            <h3>Uçak Envanteri</h3>
+            <span id="inventoryCount">5 platform</span>
+          </div>
+          <div class="aircraft-list" id="aircraftList"></div>
+        </section>
+      </aside>
+
+      <section class="ai-console" aria-labelledby="aiTitle">
+        <div class="ai-head">
+          <div>
+            <p class="eyebrow">AI rolü için ilk konsept</p>
+            <h2 id="aiTitle">Taktik Analiz Asistanı</h2>
+          </div>
+          <div class="ai-action-row">
+            <button class="action-btn" type="button" id="countryCompareOpen">Ülke Karşılaştır</button>
+            <button class="action-btn" type="button" id="mockAiOpen">AI Karşılaştırma Analizi</button>
+            <button class="action-btn" type="button" id="refreshBriefing">Analizi Yenile</button>
+          </div>
+        </div>
+        <div class="ai-body">
+          <div class="briefing-box">
+            <h3>Canlı Brifing</h3>
+            <p id="aiBriefing"></p>
+          </div>
+          <div class="briefing-box">
+            <h3>Soru Önerileri</h3>
+            <ul id="aiQuestions"></ul>
+          </div>
+          <div class="briefing-box country-ai-box">
+            <h3>Ülke AI Özeti</h3>
+            <p id="countryAiSummary"></p>
+          </div>
+          <div class="briefing-box compact">
+            <h3>Seviye Okuması</h3>
+            <div class="signal-bars" id="signalBars"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section
+      class="command-menu hidden"
+      id="commandMenu"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="menuTitle"
+      aria-hidden="true"
+    >
+      <div class="command-menu-panel">
+        <button class="menu-close" type="button" id="menuClose" aria-label="Menüyü kapat">×</button>
+        <div class="menu-head">
+          <p class="eyebrow">Komuta menüsü</p>
+          <h2 id="menuTitle">Atlas Kontrol Paneli</h2>
+        </div>
+
+        <div class="menu-account-card">
+          <div class="profile-call-sign compact" id="menuCallSign">ANL</div>
+          <div>
+            <p class="eyebrow" id="menuAccountStatus">Oturum bekleniyor</p>
+            <h3 id="menuAccountName">Ziyaretçi kullanıcı</h3>
+            <p id="menuAccountDetail">Hesap detayları için giriş yap.</p>
+          </div>
+        </div>
+
+        <div class="menu-option-list" aria-label="Menü seçenekleri">
+          <button class="menu-option" type="button" data-menu-action="account">
+            <span>01</span>
+            <strong>Hesap Detayları</strong>
+            <small id="menuAccountHint">Profil ve oturum bilgileri</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="settings">
+            <span>02</span>
+            <strong>Ayarlar</strong>
+            <small>Filtre, görünüm ve envanter yoğunluğu</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="compare">
+            <span>03</span>
+            <strong>Favoriler / Karşılaştırma</strong>
+            <small id="menuCompareHint">Seçili platformları yan yana incele</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="mockAi">
+            <span>04</span>
+            <strong>AI Karşılaştırma Analizi</strong>
+            <small>Kategoriye göre AI kabiliyet yorumu</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="countryCompare">
+            <span>05</span>
+            <strong>Ülke Karşılaştırma</strong>
+            <small>İki ülkenin hava gücü profilini yan yana oku</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="sources">
+            <span>06</span>
+            <strong>Kullandığımız Kaynaklar</strong>
+            <small>Açık kaynak veri ve görsel bağlantıları</small>
+          </button>
+          <button class="menu-option" type="button" data-menu-action="map">
+            <span>07</span>
+            <strong>Harita Konsolu</strong>
+            <small>Ülke seçimi ve ittifak görünümü</small>
+          </button>
+        </div>
+
+        <div class="menu-favorites" id="menuFavoritesPanel">
+          <div class="menu-section-head">
+            <p class="eyebrow">Favoriler</p>
+            <strong id="menuFavoriteCount">0 platform</strong>
+          </div>
+          <div id="menuFavoriteList"></div>
+        </div>
+
+        <div class="menu-sources" id="menuSourcesPanel" tabindex="-1">
+          <div class="menu-section-head">
+            <p class="eyebrow">Kaynaklar</p>
+            <strong>Kategorili doğrulama omurgası</strong>
+          </div>
+          <div class="source-group">
+            <h4>İttifak kaynakları</h4>
+            <a href="https://www.nato.int/en/about-us/organization/nato-member-countries" target="_blank" rel="noreferrer">
+              <span>NATO</span>
+              Üye ülkeler listesi
+            </a>
+            <a href="https://brics.br/en/about-the-brics" target="_blank" rel="noreferrer">
+              <span>BRICS</span>
+              Üye ülkeler listesi
+            </a>
+          </div>
+          <div class="source-group">
+            <h4>Uçak üreticileri</h4>
+            <a href="https://www.lockheedmartin.com/en-us/products/f-35.html" target="_blank" rel="noreferrer">
+              <span>F-35</span>
+              Lockheed Martin platform bilgisi
+            </a>
+            <a href="https://www.dassault-aviation.com/en/defense/rafale/" target="_blank" rel="noreferrer">
+              <span>Rafale</span>
+              Dassault Aviation platform bilgisi
+            </a>
+            <a href="https://www.eurofighter.com/" target="_blank" rel="noreferrer">
+              <span>Typhoon</span>
+              Eurofighter platform bilgisi
+            </a>
+            <a href="https://www.saab.com/products/gripen" target="_blank" rel="noreferrer">
+              <span>Gripen</span>
+              Saab platform bilgisi
+            </a>
+          </div>
+          <div class="source-group">
+            <h4>Hava kuvvetleri ve veri</h4>
+            <a href="https://www.af.mil/About-Us/Fact-Sheets/" target="_blank" rel="noreferrer">
+              <span>USAF</span>
+              Uçak bilgi kartları
+            </a>
+            <a href="https://www.tusas.com/en/products/new-projects/original-development/kaan" target="_blank" rel="noreferrer">
+              <span>KAAN</span>
+              TUSAŞ program sayfası
+            </a>
+          </div>
+          <div class="source-group">
+            <h4>Görsel ve harita</h4>
+            <a href="https://commons.wikimedia.org/" target="_blank" rel="noreferrer">
+              <span>Commons</span>
+              Uçak ve mühimmat görselleri
+            </a>
+            <a href="https://github.com/topojson/world-atlas" target="_blank" rel="noreferrer">
+              <span>Harita</span>
+              Dünya sınır verisi
+            </a>
+          </div>
+        </div>
+
+        <div class="menu-system-card">
+          <span>Performans modu</span>
+          <strong>Aktif</strong>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="compare-panel hidden"
+      id="comparePanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="compareTitle"
+      aria-hidden="true"
+    >
+      <div class="compare-shell">
+        <button class="compare-close" type="button" id="compareClose" aria-label="Karşılaştırma panelini kapat">×</button>
+        <div class="compare-head">
+          <p class="eyebrow">Analiz modu</p>
+          <h2 id="compareTitle">Platform Karşılaştırması</h2>
+          <p id="compareSummary">Karşılaştırmak için iki veya üç uçağı seç.</p>
+        </div>
+        <div class="compare-grid" id="compareGrid"></div>
+      </div>
+    </section>
+
+    <section
+      class="mock-ai-panel hidden"
+      id="mockAiPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mockAiTitle"
+      aria-hidden="true"
+    >
+      <div class="mock-ai-shell">
+        <button class="mock-ai-close" type="button" id="mockAiClose" aria-label="AI panelini kapat">×</button>
+        <div class="mock-ai-head">
+          <p class="eyebrow">AI analiz modu</p>
+          <h2 id="mockAiTitle">Kabiliyet Karşılaştırma Analizi</h2>
+          <p id="mockAiSummary">Kategori seç, iki platform belirle, kabiliyet profilini karşılaştır.</p>
+        </div>
+
+        <div class="mock-ai-controls">
+          <label>
+            Kategori
+            <select id="mockAiCategory"></select>
+          </label>
+          <label>
+            1. Platform
+            <select id="mockAiAircraftA"></select>
+          </label>
+          <label>
+            2. Platform
+            <select id="mockAiAircraftB"></select>
+          </label>
+        </div>
+
+        <div class="mock-ai-toolbar">
+          <button type="button" id="mockAiRun">AI Analizini Çalıştır</button>
+          <button type="button" id="mockAiSwap">Platformları Değiştir</button>
+        </div>
+
+        <div class="mock-ai-output">
+          <article class="mock-ai-verdict" id="mockAiVerdict"></article>
+          <div class="mock-ai-score-grid" id="mockAiScoreGrid"></div>
+          <div class="mock-ai-advantage-grid" id="mockAiAdvantageGrid"></div>
+          <div class="mock-ai-bars" id="mockAiBars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="country-compare-panel hidden"
+      id="countryComparePanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="countryCompareTitle"
+      aria-hidden="true"
+    >
+      <div class="country-compare-shell">
+        <button class="country-compare-close" type="button" id="countryCompareClose" aria-label="Ülke karşılaştırma panelini kapat">×</button>
+        <div class="country-compare-head">
+          <p class="eyebrow">Stratejik ülke analizi</p>
+          <h2 id="countryCompareTitle">Ülke Hava Gücü Karşılaştırması</h2>
+          <p id="countryCompareSummary">İki ülke seç; filo ölçeği, kabiliyet sinyalleri ve modernizasyon riskini yan yana incele.</p>
+        </div>
+
+        <div class="country-compare-controls">
+          <label>
+            1. Ülke
+            <select id="countryCompareA"></select>
+          </label>
+          <label>
+            2. Ülke
+            <select id="countryCompareB"></select>
+          </label>
+        </div>
+
+        <div class="country-compare-toolbar">
+          <button type="button" id="countryCompareRun">Ülke Analizini Çalıştır</button>
+          <button type="button" id="countryCompareSwap">Ülkeleri Değiştir</button>
+        </div>
+
+        <div class="country-compare-output">
+          <article class="country-compare-verdict" id="countryCompareVerdict"></article>
+          <div class="country-compare-score-grid" id="countryCompareScoreGrid"></div>
+          <div class="country-compare-factor-grid" id="countryCompareFactorGrid"></div>
+          <div class="country-compare-bars" id="countryCompareBars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="country-intel-panel hidden"
+      id="countryIntelPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="countryIntelTitle"
+      aria-hidden="true"
+    >
+      <div class="country-intel-shell">
+        <button class="country-intel-close" type="button" id="countryIntelClose" aria-label="Ülke hava gücü panelini kapat">×</button>
+        <div class="country-intel-head">
+          <div>
+            <p class="eyebrow" id="countryIntelCode">Ülke seçimi</p>
+            <h2 id="countryIntelTitle">Hava Gücü Profili</h2>
+            <p id="countryIntelDescription">Haritadan seçilen ülkenin açık kaynak hava gücü okuması burada gösterilir.</p>
+          </div>
+          <div class="country-intel-badge" id="countryIntelAlliance">NATO</div>
+        </div>
+
+        <div class="country-intel-layout">
+          <div class="country-intel-main">
+            <dl class="country-intel-meta">
+              <div>
+                <dt>Komuta</dt>
+                <dd id="countryIntelCommand">-</dd>
+              </div>
+              <div>
+                <dt>Odak</dt>
+                <dd id="countryIntelFocus">-</dd>
+              </div>
+              <div>
+                <dt>Envanter</dt>
+                <dd id="countryIntelInventoryCount">0 platform</dd>
+              </div>
+            </dl>
+
+            <section class="country-capability-radar" aria-labelledby="countryRadarTitle">
+              <div class="country-radar-head">
+                <div>
+                  <p class="eyebrow">HUD kabiliyet radarı</p>
+                  <h3 id="countryRadarTitle">Kabiliyet Skor Radarı</h3>
+                </div>
+                <p id="countryRadarSummary">Seçili ülkenin görev kabiliyetleri görsel skorlarla özetlenir.</p>
+              </div>
+              <div class="country-radar-body">
+                <div class="country-radar-chart" id="countryRadarChart" aria-hidden="true"></div>
+                <div class="country-radar-bars" id="countryRadarBars"></div>
+              </div>
+            </section>
+
+            <section class="country-source-trust" aria-labelledby="countrySourceTrustTitle">
+              <div class="country-source-trust-head">
+                <div>
+                  <p class="eyebrow">Kaynak güven matrisi</p>
+                  <h3 id="countrySourceTrustTitle">Kaynak Güven Skoru</h3>
+                </div>
+                <strong id="countrySourceTrustScore">0</strong>
+              </div>
+              <p id="countrySourceTrustSummary">Ülke envanteri için kaynak güven dağılımı hazırlanıyor.</p>
+              <div class="country-source-trust-meter" aria-hidden="true">
+                <span id="countrySourceTrustMeter"></span>
+              </div>
+              <div class="country-source-trust-grid" id="countrySourceTrustGrid"></div>
+            </section>
+
+            <section class="country-critical-alerts" aria-labelledby="countryCriticalAlertsTitle">
+              <div class="country-critical-alerts-head">
+                <div>
+                  <p class="eyebrow">Komuta uyarıları</p>
+                  <h3 id="countryCriticalAlertsTitle">Kritik Envanter Uyarıları</h3>
+                </div>
+                <span id="countryCriticalAlertCount">0 sinyal</span>
+              </div>
+              <p id="countryCriticalAlertSummary">Seçili ülke için kritik envanter sinyalleri hazırlanıyor.</p>
+              <div class="country-critical-alert-grid" id="countryCriticalAlertGrid"></div>
+            </section>
+
+            <div class="country-intel-analysis" id="countryIntelAnalysisGrid"></div>
+
+            <div class="country-intel-timeline">
+              <div class="section-title-row compact">
+                <h3>Modernizasyon Çizelgesi</h3>
+                <span id="countryIntelTimelineStatus">Açık kaynak okuması</span>
+              </div>
+              <div id="countryIntelTimeline"></div>
+            </div>
+          </div>
+
+          <aside class="country-intel-inventory" aria-label="Seçili ülke uçak envanteri">
+            <div class="country-intel-inventory-head">
+              <div>
+                <p class="eyebrow">Muharip platformlar</p>
+                <h3 id="countryIntelInventoryTitle">Uçak Envanteri</h3>
+              </div>
+              <button type="button" id="countryIntelCompare">Ülkeyi Karşılaştır</button>
+            </div>
+            <div
+              class="country-intel-filterbar"
+              id="countryIntelFilters"
+              role="group"
+              aria-label="Ülke envanteri filtreleri"
+            ></div>
+            <p class="country-intel-filter-summary" id="countryIntelFilterSummary">Tüm platformlar gösteriliyor.</p>
+            <div class="country-intel-aircraft-list" id="countryIntelAircraftList"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="aircraft-inspect hidden"
+      id="aircraftInspect"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="inspectAircraftTitle"
+      aria-hidden="true"
+    >
+      <div class="inspect-shell">
+        <button class="inspect-close" type="button" id="inspectClose" aria-label="İnceleme panelini kapat">×</button>
+        <div class="inspect-visual">
+          <img id="inspectAircraftImage" alt="İncelenen savaş uçağı görseli" />
+          <div class="image-fallback" id="inspectImageFallback">Görsel yüklenemedi</div>
+          <div class="inspect-visual-readout">
+            <span id="inspectAllianceBadge">NATO</span>
+            <strong id="inspectInventoryPosition">01 / 12</strong>
+          </div>
+          <a id="inspectImageCredit" href="#" target="_blank" rel="noreferrer">Wikimedia Commons</a>
+        </div>
+        <div class="inspect-detail">
+          <div class="inspect-topline">
+            <p class="eyebrow" id="inspectCountryContext">Platform inceleme</p>
+            <div class="inspect-nav" aria-label="Envanter içinde gezinme">
+              <button type="button" id="inspectPrev" aria-label="Önceki uçak">‹</button>
+              <button type="button" id="inspectNext" aria-label="Sonraki uçak">›</button>
+            </div>
+          </div>
+          <h2 id="inspectAircraftTitle">Savaş uçağı seçilmedi</h2>
+          <p id="inspectAircraftRole"></p>
+          <div class="inspect-actions">
+            <button type="button" id="inspectFavorite">Favoriye Ekle</button>
+            <button type="button" id="inspectCompare">Karşılaştırmaya Ekle</button>
+          </div>
+          <div class="inspect-meta-grid" id="inspectMetaGrid"></div>
+          <div class="spec-grid inspect-spec-grid" id="inspectSpecGrid"></div>
+          <div class="inspect-section">
+            <h3>Kabiliyet Profili</h3>
+            <div class="inspect-capability-bars" id="inspectCapabilityBars"></div>
+          </div>
+          <div class="capability-row" id="inspectCapabilityRow"></div>
+          <button class="munition-open" type="button" id="inspectMunitionOpen" aria-haspopup="dialog">
+            <span>
+              <small>Yükleme profili</small>
+              Kullanabildiği Mühimmatlar
+            </span>
+            <strong id="inspectMunitionCount">0 mühimmat</strong>
+          </button>
+          <div class="inspect-section">
+            <h3>Envanter Bağlamı</h3>
+            <p id="inspectInventoryContext"></p>
+          </div>
+          <div class="inspect-section">
+            <h3>Kaynak ve Doğrulama</h3>
+            <div class="inspect-source-grid" id="inspectSourceGrid"></div>
+          </div>
+          <p class="detail-note" id="inspectAircraftNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <section
+      class="munition-modal hidden"
+      id="munitionPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="munitionTitle"
+      aria-hidden="true"
+    >
+      <div class="munition-shell">
+        <button class="munition-close" type="button" id="munitionClose" aria-label="Mühimmat panelini kapat">×</button>
+        <div class="munition-head">
+          <p class="eyebrow" id="munitionSubtitle">Açık kaynak mühimmat profili</p>
+          <h2 id="munitionTitle">Mühimmat Envanteri</h2>
+          <p id="munitionSummary"></p>
+        </div>
+        <div class="munition-stats" id="munitionStats"></div>
+        <div class="munition-filters" id="munitionFilters" role="group" aria-label="Mühimmat filtreleri"></div>
+        <article class="munition-detail-card" id="munitionDetail" aria-live="polite">
+          <div class="munition-detail-visual">
+            <img id="munitionDetailImage" alt="Seçili mühimmat görseli" />
+            <a id="munitionImageCredit" class="hidden" href="#" target="_blank" rel="noreferrer">Wikimedia Commons</a>
+          </div>
+          <div class="munition-detail-copy">
+            <p class="eyebrow" id="munitionDetailCategory">Mühimmat bilgi kartı</p>
+            <h3 id="munitionDetailName">Mühimmat seçilmedi</h3>
+            <p id="munitionDetailDescription"></p>
+            <dl class="munition-detail-grid">
+              <div>
+                <dt>Rol</dt>
+                <dd id="munitionDetailRole">-</dd>
+              </div>
+              <div>
+                <dt>Güdüm</dt>
+                <dd id="munitionDetailGuidance">-</dd>
+              </div>
+              <div>
+                <dt>Menşei</dt>
+                <dd id="munitionDetailOrigin">-</dd>
+              </div>
+              <div>
+                <dt>Not</dt>
+                <dd id="munitionDetailNote">-</dd>
+              </div>
+            </dl>
+          </div>
+        </article>
+        <div class="munition-categories" id="munitionCategories"></div>
+        <p class="munition-caveat">
+          Not: Listeler açık kaynaklarda bilinen uyumlu/entegrasyonu raporlanan mühimmat ailelerini temsil eder; kullanıcı ülke,
+          modernizasyon paketi ve sertifikasyon durumuna göre değişebilir.
+        </p>
+      </div>
+    </section>
+
+    <section class="auth-modal hidden" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle" aria-hidden="true">
+      <div class="auth-panel">
+        <button class="auth-close" type="button" id="authClose" aria-label="Paneli kapat">×</button>
+        <div class="auth-panel-head">
+          <p class="eyebrow">Güvenli erişim</p>
+          <h2 id="authTitle">Kullanıcı Paneli</h2>
+        </div>
+
+        <div class="auth-tabs" id="authTabs" role="tablist" aria-label="Kullanıcı işlemleri">
+          <button class="auth-tab active" type="button" data-auth-mode="login">Giriş</button>
+          <button class="auth-tab" type="button" data-auth-mode="register">Kayıt Ol</button>
+        </div>
+
+        <form class="auth-form" id="loginForm" autocomplete="on">
+          <label>
+            E-posta
+            <input id="loginEmail" name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Şifre
+            <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="auth-submit" type="submit">Giriş Yap</button>
+          <div class="auth-inline-action">
+            <button class="auth-link-button" type="button" id="forgotPasswordOpen">Şifremi Unuttum</button>
+          </div>
+        </form>
+
+        <form class="auth-form hidden" id="forgotPasswordForm" autocomplete="on">
+          <p class="auth-form-note" id="forgotPasswordNote">
+            Kayıtlı e-posta adresini girerek bu tarayıcıdaki hesabın için yeni şifre belirleyebilirsin.
+          </p>
+          <label>
+            E-posta
+            <input id="forgotEmail" name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Yeni şifre
+            <input id="forgotPassword" name="password" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <label>
+            Yeni şifre tekrar
+            <input id="forgotPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <button class="auth-submit" type="submit">Şifreyi Güncelle</button>
+          <button class="auth-submit secondary" type="button" id="forgotBackLogin">Girişe Dön</button>
+        </form>
+
+        <form class="auth-form hidden" id="registerForm" autocomplete="on">
+          <label>
+            Kullanıcı adı
+            <input id="registerName" name="name" type="text" autocomplete="name" minlength="2" maxlength="28" required />
+          </label>
+          <label>
+            E-posta
+            <input id="registerEmail" name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Şifre
+            <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <label>
+            Şifre tekrar
+            <input id="registerPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" required />
+          </label>
+          <label>
+            Analiz profili
+            <select id="registerProfile" name="profile">
+              <option value="Tarafsız">Tarafsız gözlemci</option>
+              <option value="NATO">NATO odaklı</option>
+              <option value="BRICS">BRICS odaklı</option>
+            </select>
+          </label>
+          <button class="auth-submit" type="submit">Hesap Oluştur</button>
+        </form>
+
+        <div class="auth-account-tabs hidden" id="authAccountTabs" role="tablist" aria-label="Hesap paneli">
+          <button class="auth-account-tab active" type="button" data-account-panel="profile">Profil</button>
+          <button class="auth-account-tab" type="button" data-account-panel="settings">Ayarlar</button>
+        </div>
+
+        <div class="auth-profile hidden" id="authProfile">
+          <div class="profile-card">
+            <div class="profile-call-sign" id="authCallSign">ANL</div>
+            <div>
+              <p class="eyebrow">Aktif oturum</p>
+              <h3 id="authUserName">Kullanıcı</h3>
+              <p id="authUserEmail"></p>
+              <span id="authUserProfile"></span>
+            </div>
+          </div>
+
+          <form class="auth-form account-form" id="profileForm" autocomplete="on">
+            <label>
+              Kullanıcı adı
+              <input id="profileName" name="name" type="text" minlength="2" maxlength="28" required />
+            </label>
+            <label>
+              Analiz profili
+              <select id="profileType" name="profile">
+                <option value="Tarafsız">Tarafsız gözlemci</option>
+                <option value="NATO">NATO odaklı</option>
+                <option value="BRICS">BRICS odaklı</option>
+              </select>
+            </label>
+            <button class="auth-submit" type="submit">Profili Kaydet</button>
+          </form>
+
+          <div class="account-grid" aria-label="Oturum özeti">
+            <div>
+              <span>Kayıt</span>
+              <strong id="authCreatedAt">-</strong>
+            </div>
+            <div>
+              <span>Son ülke</span>
+              <strong id="authLastCountry">-</strong>
+            </div>
+            <div>
+              <span>Son uçak</span>
+              <strong id="authLastAircraft">-</strong>
+            </div>
+            <div>
+              <span>Varsayılan filtre</span>
+              <strong id="authDefaultFilter">Tümü</strong>
+            </div>
+          </div>
+
+          <button class="auth-submit secondary" type="button" id="authLogout">Çıkış Yap</button>
+        </div>
+
+        <form class="auth-form auth-settings hidden" id="settingsForm">
+          <label>
+            Varsayılan ittifak filtresi
+            <select id="settingsDefaultFilter" name="defaultFilter">
+              <option value="all">Tümü</option>
+              <option value="NATO">NATO</option>
+              <option value="BRICS">BRICS</option>
+            </select>
+          </label>
+          <label>
+            Envanter yoğunluğu
+            <select id="settingsInventoryDensity" name="inventoryDensity">
+              <option value="comfortable">Standart</option>
+              <option value="compact">Kompakt</option>
+            </select>
+          </label>
+          <label>
+            Oturum başlangıcı
+            <select id="settingsRememberSelection" name="rememberSelection">
+              <option value="on">Son ülke ve uçağı hatırla</option>
+              <option value="off">Varsayılan açılış</option>
+            </select>
+          </label>
+          <div class="settings-toggle-list">
+            <label class="settings-toggle">
+              <input id="settingsReducedMotion" type="checkbox" />
+              <span>Animasyonları azalt</span>
+            </label>
+            <label class="settings-toggle">
+              <input id="settingsHighContrast" type="checkbox" />
+              <span>Yüksek kontrast</span>
+            </label>
+          </div>
+          <button class="auth-submit" type="submit">Ayarları Kaydet</button>
+        </form>
+
+        <p class="auth-message" id="authMessage" role="status" aria-live="polite"></p>
+        <p class="auth-footnote">Bu prototipte hesaplar yalnızca bu tarayıcıda saklanır.</p>
+      </div>
+    </section>
+
+    <footer class="source-footer">
+      <span>Kaynak omurgası:</span>
+      <a href="https://www.nato.int/en/about-us/organization/nato-member-countries" target="_blank" rel="noreferrer">NATO üye listesi</a>
+      <a href="https://brics.br/en/about-the-brics" target="_blank" rel="noreferrer">BRICS üye listesi</a>
+      <a href="https://www.af.mil/About-Us/Fact-Sheets/" target="_blank" rel="noreferrer">USAF uçak bilgi kartları</a>
+      <a href="https://commons.wikimedia.org/" target="_blank" rel="noreferrer">Wikimedia Commons görselleri</a>
+    </footer>
+  </body>
+</html>
